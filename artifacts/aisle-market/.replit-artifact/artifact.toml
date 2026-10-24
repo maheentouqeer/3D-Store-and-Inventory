@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Aisle Market"
+description = "A first-person 3D grocery store where shoppers browse aisles, search products, and check out, while managers maintain live inventory and reorder stock."
+version = "1.0.0"
+id = "artifacts/aisle-market"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22610
+
+[services.development]
+run = "pnpm --filter @workspace/aisle-market run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/aisle-market", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/aisle-market/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22610"
+BASE_PATH = "/"
