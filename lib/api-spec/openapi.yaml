@@ -3,13 +3,19 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Shopper and inventory API for Aisle Market
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: store
+    description: Product catalog and store layout
+  - name: inventory
+    description: Manager inventory and activity
+  - name: orders
+    description: Demo checkout and receipts
 paths:
   /healthz:
     get:
@@ -24,6 +30,179 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /products:
+    get:
+      operationId: listProducts
+      tags: [store]
+      summary: List products
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Products matching the optional search and category filters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+  /aisles:
+    get:
+      operationId: listAisles
+      tags: [store]
+      summary: List store aisles
+      responses:
+        "200":
+          description: Aisles in the 3D store
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Aisle"
+  /inventory/summary:
+    get:
+      operationId: getInventorySummary
+      tags: [inventory]
+      summary: Get the manager overview
+      responses:
+        "200":
+          description: Store inventory and sales overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventorySummary"
+  /inventory/low-stock:
+    get:
+      operationId: listLowStock
+      tags: [inventory]
+      summary: List items at or below their reorder level
+      responses:
+        "200":
+          description: Products that need replenishment
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockLevel"
+  /inventory/activity:
+    get:
+      operationId: listInventoryActivity
+      tags: [inventory]
+      summary: List recent inventory and order activity
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEvent"
+  /shelf-slots/{slotId}/stock:
+    patch:
+      operationId: updateStock
+      tags: [inventory]
+      summary: Update stock quantity and reorder level
+      parameters:
+        - name: slotId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StockUpdate"
+      responses:
+        "200":
+          description: Updated stock level
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockLevel"
+        "404":
+          description: Shelf slot not found
+  /products/{productId}/price:
+    patch:
+      operationId: updateProductPrice
+      tags: [inventory]
+      summary: Update a product price
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductPriceUpdate"
+      responses:
+        "200":
+          description: Updated product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Product not found
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: List recent demo orders
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Recent orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Create a demo order and decrement inventory
+      description: Records a no-charge demo checkout. No payment is collected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderInput"
+      responses:
+        "201":
+          description: Demo order receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Invalid order or insufficient stock
 components:
   schemas:
     HealthStatus:
@@ -33,4 +212,131 @@ components:
           type: string
       required:
         - status
+    Product:
+      type: object
+      required: [id, sku, name, category, price, imageUrl, packageColor, aisleId, aisleName, slotId, stockQuantity, reorderLevel, unit, featured]
+      properties:
+        id: { type: string }
+        sku: { type: string }
+        name: { type: string }
+        description: { type: string }
+        category: { type: string }
+        price: { type: number }
+        salePrice: { type: ["number", "null"] }
+        imageUrl: { type: string }
+        packageColor: { type: string }
+        aisleId: { type: string }
+        aisleName: { type: string }
+        slotId: { type: string }
+        stockQuantity: { type: integer }
+        reorderLevel: { type: integer }
+        unit: { type: string }
+        featured: { type: boolean }
+    Aisle:
+      type: object
+      required: [id, number, name, category, color, productCount]
+      properties:
+        id: { type: string }
+        number: { type: integer }
+        name: { type: string }
+        category: { type: string }
+        color: { type: string }
+        productCount: { type: integer }
+    StockLevel:
+      type: object
+      required: [slotId, productId, sku, productName, category, aisleName, quantity, reorderLevel, price, stockStatus]
+      properties:
+        slotId: { type: string }
+        productId: { type: string }
+        sku: { type: string }
+        productName: { type: string }
+        category: { type: string }
+        aisleName: { type: string }
+        quantity: { type: integer }
+        reorderLevel: { type: integer }
+        price: { type: number }
+        stockStatus: { type: string, enum: [healthy, low, empty] }
+    InventorySummary:
+      type: object
+      required: [totalUnits, lowStockCount, outOfStockCount, inventoryValue, ordersToday, revenueToday, topProducts]
+      properties:
+        totalUnits: { type: integer }
+        lowStockCount: { type: integer }
+        outOfStockCount: { type: integer }
+        inventoryValue: { type: number }
+        ordersToday: { type: integer }
+        revenueToday: { type: number }
+        topProducts:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopProduct"
+    TopProduct:
+      type: object
+      required: [productId, name, category, unitsSold]
+      properties:
+        productId: { type: string }
+        name: { type: string }
+        category: { type: string }
+        unitsSold: { type: integer }
+    ActivityEvent:
+      type: object
+      required: [id, kind, description, createdAt]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [restock, price_change, order, low_stock] }
+        description: { type: string }
+        createdAt: { type: string, format: date-time }
+    OrderLineInput:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId: { type: string }
+        quantity: { type: integer, minimum: 1, maximum: 25 }
+    OrderInput:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/OrderLineInput"
+    OrderLine:
+      type: object
+      required: [productId, name, quantity, unitPrice, lineTotal]
+      properties:
+        productId: { type: string }
+        name: { type: string }
+        quantity: { type: integer }
+        unitPrice: { type: number }
+        lineTotal: { type: number }
+    Order:
+      type: object
+      required: [id, orderNumber, status, paymentStatus, subtotal, tax, total, itemCount, items, createdAt]
+      properties:
+        id: { type: string }
+        orderNumber: { type: string }
+        status: { type: string, enum: [completed] }
+        paymentStatus: { type: string, enum: [demo_no_charge] }
+        subtotal: { type: number }
+        tax: { type: number }
+        total: { type: number }
+        itemCount: { type: integer }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderLine"
+        createdAt: { type: string, format: date-time }
+    StockUpdate:
+      type: object
+      required: [quantity, reorderLevel]
+      properties:
+        quantity: { type: integer, minimum: 0, maximum: 10000 }
+        reorderLevel: { type: integer, minimum: 0, maximum: 10000 }
+    ProductPriceUpdate:
+      type: object
+      required: [price]
+      properties:
+        price: { type: number, minimum: 0, maximum: 99999 }
 
